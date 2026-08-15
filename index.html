@@ -144,6 +144,12 @@
         <h2 class="card-title">調べる単語</h2>
         <ul class="gap-list" id="result-gaps"></ul>
       </div>
+
+      <div class="card">
+        <h2 class="card-title">このセッションを書き出す</h2>
+        <p class="hint">3 ラウンドの音声とメモを 1 つのファイルにまとめます。別の端末や新しいブラウザでも「読み込む」で戻せます。</p>
+        <button class="btn btn-ghost btn-lg" id="btn-export-session" type="button">ファイルに書き出す</button>
+      </div>
     </div>
 
     <footer class="footer">
@@ -159,6 +165,12 @@
       <span class="icon-btn ghost" aria-hidden="true"></span>
     </header>
     <div class="scroll" id="history-list"></div>
+    <footer class="footer">
+      <div class="row-2">
+        <button class="btn btn-ghost" id="btn-export-all" type="button">すべて書き出す</button>
+        <button class="btn btn-ghost" id="btn-import-history" type="button">読み込む</button>
+      </div>
+    </footer>
   </section>
 
   <!-- ============ SETTINGS ============ -->
@@ -204,6 +216,18 @@
       </div>
 
       <div class="card">
+        <h2 class="card-title">書き出し・読み込み</h2>
+        <p class="hint">
+          録音はブラウザ内にしかないので、履歴を消したり端末を変えたりすると失われます。
+          ファイルに書き出しておけば、あとから「読み込む」で戻せます。
+        </p>
+        <div class="row-2">
+          <button class="btn btn-ghost" id="btn-settings-export" type="button">すべて書き出す</button>
+          <button class="btn btn-ghost" id="btn-settings-import" type="button">読み込む</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2 class="card-title">保存データ</h2>
         <p class="hint">録音はこの端末のブラウザ内（IndexedDB）だけに保存されます。どこにも送信されません。</p>
         <p class="hint" id="storage-usage"></p>
@@ -213,6 +237,8 @@
   </section>
 
 </div>
+
+<input type="file" id="import-file" accept=".json,application/json" hidden>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 

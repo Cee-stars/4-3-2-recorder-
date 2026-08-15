@@ -1,5 +1,5 @@
 /* オフラインでも練習できるように、アプリ本体だけキャッシュする。録音データは触らない。 */
-const CACHE = '432recorder-v1';
+const CACHE = '432recorder-v2';
 const SHELL = [
   './',
   'index.html',
@@ -12,6 +12,7 @@ const SHELL = [
   'src/session.js',
   'src/speech.js',
   'src/storage.js',
+  'src/transfer.js',
 ];
 
 self.addEventListener('install', event => {

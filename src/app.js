@@ -13,6 +13,7 @@ import { Transcriber, isSpeechSupported, countWords } from './speech.js';
 import {
   putSession, getSession, deleteSession, clearSessions, listSessions, estimateUsage,
 } from './storage.js';
+import { exportSessions, importFile, fileNameFor, download, formatSize } from './transfer.js';
 
 const $ = sel => document.querySelector(sel);
 const RING_LENGTH = 2 * Math.PI * 92;
@@ -326,6 +327,14 @@ async function enterPhase(phase) {
     return;
   }
 
+  // 着信などでマイクを取り上げられていることがあるので、ラウンドのたびに確かめて
+  // 必要なら取り直す。2・3 ラウンド目が無音で終わるのを防ぐ。
+  if (!mic.active && isRecordingSupported()) {
+    try {
+      await mic.open();
+    } catch { /* 取れなければ録音なしで続ける */ }
+  }
+
   if (mic.active) {
     try {
       mic.startRound();
@@ -334,6 +343,8 @@ async function enterPhase(phase) {
     } catch {
       toast('このラウンドは録音できませんでした');
     }
+  } else {
+    toast('マイクが使えないため、このラウンドは録音しません');
   }
 
   if (wantsTranscript) {
@@ -529,6 +540,67 @@ function renderResult(record) {
   if (gaps.length) renderGapList($('#result-gaps'), gaps, { editable: false });
 }
 
+/* ---------------- 書き出し・読み込み ---------------- */
+
+async function exportRecords(records, emptyMessage) {
+  if (!records.length) {
+    toast(emptyMessage);
+    return;
+  }
+  toast('書き出しています…');
+  try {
+    const blob = await exportSessions(records);
+    download(blob, fileNameFor(records));
+    toast(`${records.length} 件を書き出しました（${formatSize(blob.size)}）`);
+  } catch {
+    toast('書き出せませんでした');
+  }
+}
+
+async function exportAll() {
+  const records = await listSessions();
+  await exportRecords(records, '書き出せる記録がありません');
+}
+
+/** ファイル選択を開き、読み込んだセッションを履歴に足す。 */
+function openImportDialog() {
+  const input = $('#import-file');
+  input.value = '';
+  input.click();
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  toast('読み込んでいます…');
+  let sessions;
+  try {
+    sessions = await importFile(file);
+  } catch (err) {
+    toast(err.message || '読み込めませんでした');
+    return;
+  }
+
+  let added = 0;
+  for (const session of sessions) {
+    // 同じ id が既にある場合は上書きせず、別の記録として残す。
+    const existing = await getSession(session.id).catch(() => null);
+    if (existing) session.id = `${session.id}_i${Date.now().toString(36)}${added}`;
+    try {
+      await putSession(session);
+      added += 1;
+    } catch {
+      toast('保存できませんでした（空き容量を確認してください）');
+      break;
+    }
+  }
+
+  if (added) {
+    toast(`${added} 件を読み込みました`);
+    show('screen-history');
+    await renderHistory();
+  }
+}
+
 /* ---------------- 履歴 ---------------- */
 
 async function renderHistory() {
@@ -658,6 +730,15 @@ function bind() {
     toast('削除しました');
     show('screen-setup');
   });
+
+  $('#btn-export-session').addEventListener('click', () => {
+    exportRecords(state.viewing ? [state.viewing] : [], '書き出せる記録がありません');
+  });
+  $('#btn-export-all').addEventListener('click', exportAll);
+  $('#btn-settings-export').addEventListener('click', exportAll);
+  ['#btn-import-history', '#btn-settings-import']
+    .forEach(sel => $(sel).addEventListener('click', openImportDialog));
+  $('#import-file').addEventListener('change', e => handleImportFile(e.target.files?.[0]));
 
   $('#btn-open-history').addEventListener('click', async () => {
     show('screen-history');
