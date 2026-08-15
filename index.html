@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="description" content="4/3/2 テクニック用のスピーキング練習レコーダー。4分・3分・2分の3ラウンドを自動で計測し、各ラウンドを録音します。">
+<title>4/3/2 Recorder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="4/3/2">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen is-active" id="screen-setup">
+    <header class="topbar">
+      <h1 class="brand">4<span>/</span>3<span>/</span>2 <small>Recorder</small></h1>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="btn-open-history" type="button" aria-label="履歴">🗂</button>
+        <button class="icon-btn" id="btn-open-settings" type="button" aria-label="設定">⚙️</button>
+      </div>
+    </header>
+
+    <div class="scroll">
+      <div class="card">
+        <h2 class="card-title">1. 話題を一つ決める</h2>
+        <p class="hint">絶対条件：慣れた内容にすること（話したい内容など）</p>
+        <input class="input" id="input-topic" type="text" inputmode="text" autocomplete="off"
+               placeholder="例：My morning routine" maxlength="120">
+        <div class="chips" id="topic-suggestions" aria-label="トピック候補"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">2. メモは 3〜4 単語まで</h2>
+        <p class="hint">原稿は書かない。キーワードだけ。ラウンド中も画面に表示されます。</p>
+        <form class="memo-form" id="memo-form" autocomplete="off">
+          <input class="input" id="input-memo" type="text" placeholder="単語を入力して Enter" maxlength="24">
+          <button class="btn btn-ghost" type="submit" id="btn-add-memo">追加</button>
+        </form>
+        <div class="chips chips-memo" id="memo-list" aria-live="polite"></div>
+        <p class="counter"><span id="memo-count">0</span> / 4 単語</p>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">3. 進行</h2>
+        <ol class="plan" id="plan-preview"></ol>
+        <label class="switch">
+          <input type="checkbox" id="toggle-transcribe">
+          <span class="switch-body"><span class="switch-knob"></span></span>
+          <span class="switch-label">
+            文字起こしをする <em class="tag">ベータ</em>
+            <small>端末の音声認識を使います。対応していない場合は自動でオフになります。</small>
+          </span>
+        </label>
+      </div>
+
+      <p class="mic-note" id="mic-note" hidden></p>
+    </div>
+
+    <footer class="footer">
+      <button class="btn btn-primary btn-lg" id="btn-start" type="button">スタート</button>
+    </footer>
+  </section>
+
+  <!-- ============ SESSION ============ -->
+  <section class="screen screen-session" id="screen-session">
+    <header class="session-head">
+      <span class="phase-badge" id="phase-badge">1ラウンド目</span>
+      <button class="icon-btn" id="btn-abort" type="button" aria-label="中断">✕</button>
+    </header>
+
+    <div class="stage" id="stage">
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="ring-track" cx="100" cy="100" r="92"></circle>
+          <circle class="ring-bar" id="ring-bar" cx="100" cy="100" r="92"></circle>
+        </svg>
+        <div class="ring-center">
+          <div class="clock" id="clock">4:00</div>
+          <div class="rec" id="rec-indicator"><span class="dot"></span>REC</div>
+        </div>
+      </div>
+
+      <p class="cue" id="cue">内容を出し切る。詰まって ok。沈黙 ok。</p>
+
+      <div class="level" id="level-wrap" aria-hidden="true"><div class="level-bar" id="level-bar"></div></div>
+
+      <div class="chips chips-memo chips-static" id="session-memo"></div>
+
+      <div class="live-transcript" id="live-transcript" hidden></div>
+
+      <!-- Break 1: words you could not say -->
+      <div class="break-panel" id="break-notes" hidden>
+        <p class="break-title">言えなかった単語を 1〜2 個メモして調べる</p>
+        <form class="memo-form" id="gap-form" autocomplete="off">
+          <input class="input" id="input-gap" type="text" placeholder="日本語でも英語でも OK" maxlength="40">
+          <button class="btn btn-ghost" type="submit">追加</button>
+        </form>
+        <ul class="gap-list" id="gap-list"></ul>
+      </div>
+
+      <!-- Break 2: look at nothing -->
+      <div class="break-panel breathe" id="break-breathe" hidden>
+        <div class="breathe-circle"><span id="breathe-text">吸って</span></div>
+        <p class="break-title muted">何も見ない。深呼吸だけ。</p>
+      </div>
+    </div>
+
+    <footer class="footer footer-session">
+      <button class="btn btn-ghost" id="btn-skip" type="button">次へ進む</button>
+    </footer>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section class="screen" id="screen-result">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-result-back" type="button" aria-label="戻る">‹</button>
+      <h1 class="brand brand-sm" id="result-title">お疲れさま</h1>
+      <button class="icon-btn" id="btn-result-delete" type="button" aria-label="削除">🗑</button>
+    </header>
+
+    <div class="scroll">
+      <div class="card result-head">
+        <p class="result-topic" id="result-topic"></p>
+        <p class="result-date" id="result-date"></p>
+        <div class="chips chips-memo chips-static" id="result-memo"></div>
+      </div>
+
+      <div class="card" id="result-speed-card" hidden>
+        <h2 class="card-title">スピード（words / min）</h2>
+        <div class="bars" id="result-bars"></div>
+        <p class="hint" id="result-speed-note"></p>
+      </div>
+
+      <div id="result-rounds"></div>
+
+      <div class="card" id="result-gap-card" hidden>
+        <h2 class="card-title">調べる単語</h2>
+        <ul class="gap-list" id="result-gaps"></ul>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <button class="btn btn-primary btn-lg" id="btn-again" type="button">もう一度やる</button>
+    </footer>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="screen" id="screen-history">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-history-back" type="button" aria-label="戻る">‹</button>
+      <h1 class="brand brand-sm">履歴</h1>
+      <span class="icon-btn ghost" aria-hidden="true"></span>
+    </header>
+    <div class="scroll" id="history-list"></div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="screen" id="screen-settings">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-settings-back" type="button" aria-label="戻る">‹</button>
+      <h1 class="brand brand-sm">設定</h1>
+      <span class="icon-btn ghost" aria-hidden="true"></span>
+    </header>
+
+    <div class="scroll">
+      <div class="card">
+        <h2 class="card-title">時間（分）</h2>
+        <div class="field"><label for="set-r1">1ラウンド目</label><input class="num" id="set-r1" type="number" min="1" max="15" step="1"></div>
+        <div class="field"><label for="set-r2">2ラウンド目</label><input class="num" id="set-r2" type="number" min="1" max="15" step="1"></div>
+        <div class="field"><label for="set-r3">3ラウンド目</label><input class="num" id="set-r3" type="number" min="1" max="15" step="1"></div>
+        <div class="field"><label for="set-break">休憩</label><input class="num" id="set-break" type="number" min="0" max="10" step="1"></div>
+        <button class="btn btn-ghost" id="btn-reset-times" type="button">4 / 3 / 2 に戻す</button>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">音声認識の言語</h2>
+        <select class="input" id="set-lang">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="en-AU">English (AU)</option>
+          <option value="ja-JP">日本語</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">その他</h2>
+        <label class="switch">
+          <input type="checkbox" id="set-sound">
+          <span class="switch-body"><span class="switch-knob"></span></span>
+          <span class="switch-label">合図の音を鳴らす<small>ラウンド終了と残り 10 秒でお知らせ</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="set-autonext">
+          <span class="switch-body"><span class="switch-knob"></span></span>
+          <span class="switch-label">休憩を自動で終える<small>オフにすると自分のタイミングで次へ進めます</small></span>
+        </label>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">保存データ</h2>
+        <p class="hint">録音はこの端末のブラウザ内（IndexedDB）だけに保存されます。どこにも送信されません。</p>
+        <p class="hint" id="storage-usage"></p>
+        <button class="btn btn-danger" id="btn-clear-all" type="button">すべての履歴を削除</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

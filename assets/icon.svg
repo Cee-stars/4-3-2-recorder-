@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="4/3/2 Recorder">
+  <rect width="512" height="512" rx="112" fill="#2563eb"/>
+  <circle cx="256" cy="256" r="164" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="20"/>
+  <path d="M256 92a164 164 0 0 1 142 82" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
+  <text x="256" y="238" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
+        font-size="104" font-weight="700" fill="#ffffff">4/3/2</text>
+  <rect x="238" y="286" width="36" height="72" rx="18" fill="#ffffff"/>
+  <path d="M214 330a42 42 0 0 0 84 0" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+  <rect x="248" y="372" width="16" height="26" rx="8" fill="#ffffff"/>
+</svg>

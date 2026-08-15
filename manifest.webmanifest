@@ -1,0 +1,20 @@
+{
+  "name": "4/3/2 Recorder",
+  "short_name": "4/3/2",
+  "description": "4/3/2 テクニックのスピーキング練習用レコーダー",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f7f9",
+  "theme_color": "#2563eb",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
