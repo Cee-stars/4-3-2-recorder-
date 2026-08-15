@@ -34,6 +34,30 @@ const mic = new Mic();
 const chime = new Chime();
 let transcriber = null;
 
+/* ---------------- 画面の高さ ---------------- */
+
+/**
+ * iOS Safari では position:fixed の高さがツールバーの出入りに追従せず、
+ * スタートボタンの下に余白が残ることがある。
+ * 実際に見えている高さを測って CSS に渡す。
+ */
+function syncViewportHeight() {
+  const height = window.visualViewport?.height ?? window.innerHeight;
+  if (height > 0) {
+    document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+  }
+}
+
+function watchViewportHeight() {
+  syncViewportHeight();
+  window.addEventListener('resize', syncViewportHeight);
+  window.addEventListener('orientationchange', () => setTimeout(syncViewportHeight, 200));
+  window.visualViewport?.addEventListener('resize', syncViewportHeight);
+  // ツールバーの出入りはスクロール中に起きるので、その間も合わせ続ける。
+  window.visualViewport?.addEventListener('scroll', syncViewportHeight);
+  window.addEventListener('pageshow', syncViewportHeight);
+}
+
 /* ---------------- 画面切り替え ---------------- */
 
 function show(id) {
@@ -686,6 +710,7 @@ async function showUsage() {
 /* ---------------- 起動 ---------------- */
 
 function bind() {
+  watchViewportHeight();
   renderTopicSuggestions();
   renderMemo();
   renderPlan();
