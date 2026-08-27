@@ -1,5 +1,5 @@
 /* オフラインでも練習できるように、アプリ本体だけキャッシュする。録音データは触らない。 */
-const CACHE = '432recorder-v2';
+const CACHE = '432recorder-v3';
 const SHELL = [
   './',
   'index.html',
@@ -30,20 +30,30 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const { request } = event;
   if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return;
-
-  // キャッシュを即返しつつ裏で更新する（更新は次回の起動から反映）。
-  event.respondWith(
-    caches.match(request).then(cached => {
-      const network = fetch(request)
-        .then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  event.respondWith(networkFirst(request));
 });
+
+/**
+ * まずネットワークを見て、取れたらキャッシュを更新する。
+ * キャッシュ優先だと更新後の 1 回目がいつも古い版になり、
+ * 直したはずのものが直っていないように見えるため。
+ * オフラインのときだけキャッシュを返す。
+ */
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (err) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    if (request.mode === 'navigate') {
+      const shell = await caches.match('index.html');
+      if (shell) return shell;
+    }
+    throw err;
+  }
+}

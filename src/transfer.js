@@ -48,6 +48,7 @@ async function toPlain(record) {
     memo: record.memo || [],
     gaps: record.gaps || [],
     settings: record.settings || null,
+    partial: !!record.partial,
     rounds,
   };
 }
@@ -71,6 +72,7 @@ function fromPlain(plain) {
     memo: Array.isArray(plain.memo) ? plain.memo.map(String) : [],
     gaps: Array.isArray(plain.gaps) ? plain.gaps.map(String) : [],
     settings: plain.settings ?? null,
+    partial: !!plain.partial,
     rounds,
   };
 }

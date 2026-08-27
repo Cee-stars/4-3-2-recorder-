@@ -14,15 +14,19 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json',
 };
 
-/** テスト用にリポジトリをそのまま配信する。 */
-export async function startServer() {
+/** テスト用にディレクトリをそのまま配信する（既定はリポジトリ全体）。 */
+export async function startServer(root = ROOT) {
   const server = http.createServer(async (req, res) => {
     const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    const file = path.join(ROOT, rel === '/' ? 'index.html' : rel);
-    if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }
+    const file = path.join(root, rel === '/' ? 'index.html' : rel);
+    if (!file.startsWith(root)) { res.writeHead(403).end(); return; }
     try {
       const body = await fs.readFile(file);
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' });
+      res.writeHead(200, {
+        'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
+        // 更新が届くかどうかを見たいので、ブラウザ側のキャッシュは挟まない。
+        'cache-control': 'no-store',
+      });
       res.end(body);
     } catch {
       res.writeHead(404).end('not found');

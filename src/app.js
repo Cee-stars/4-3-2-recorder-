@@ -41,11 +41,17 @@ let transcriber = null;
  * スタートボタンの下に余白が残ることがある。
  * 実際に見えている高さを測って CSS に渡す。
  */
+let viewportRaf = 0;
 function syncViewportHeight() {
-  const height = window.visualViewport?.height ?? window.innerHeight;
-  if (height > 0) {
-    document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
-  }
+  // スクロール中に何度も呼ばれるため、1 フレームに 1 回だけ反映する。
+  if (viewportRaf) return;
+  viewportRaf = requestAnimationFrame(() => {
+    viewportRaf = 0;
+    const height = window.visualViewport?.height ?? window.innerHeight;
+    if (height > 0) {
+      document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+    }
+  });
 }
 
 function watchViewportHeight() {
@@ -427,8 +433,22 @@ async function leavePhase(phase, { elapsedMs }) {
     words: countWords(transcript),
   });
 
+  // iOS はバックグラウンドのページを容赦なく捨てる。12 分のセッションの
+  // 途中で落ちても録音が残るよう、ラウンドが終わるたびに保存しておく。
+  await saveProgress();
+
   const isLast = phase.index === state.settings.roundMinutes.length - 1;
   if (isLast) chime.sessionEnd(); else chime.roundEnd();
+}
+
+/** 途中経過を保存する。最後まで終わったものと区別できるよう partial を立てる。 */
+async function saveProgress() {
+  if (!state.record) return;
+  try {
+    await putSession({ ...state.record, gaps: [...state.gaps], partial: true });
+  } catch {
+    toast('保存できませんでした（空き容量を確認してください）');
+  }
 }
 
 async function finishSession() {
@@ -437,6 +457,7 @@ async function finishSession() {
   mic.close();
   state.session = null;
   state.record.gaps = [...state.gaps];
+  state.record.partial = false;
 
   try {
     await putSession(state.record);
@@ -453,6 +474,8 @@ function abortSession() {
   state.session.abort();
   state.session = null;
   stopBreathing();
+  if (state.record) deleteSession(state.record.id).catch(() => {});
+  state.record = null;
   transcriber?.stop();
   transcriber = null;
   stopLevelMeter();
@@ -653,9 +676,16 @@ async function renderHistory() {
     const sub = document.createElement('div');
     sub.className = 'h-sub';
     const total = (record.rounds || []).reduce((sum, r) => sum + r.durationMs, 0);
-    sub.textContent = `${new Date(record.createdAt).toLocaleString('ja-JP', {
+    const when = new Date(record.createdAt).toLocaleString('ja-JP', {
       month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    })}・${(record.rounds || []).length} ラウンド・${formatDuration(total)}`;
+    });
+    // 最後まで終わらなかったセッション（アプリが落ちた等）は一目で分かるように。
+    sub.textContent = [
+      when,
+      `${(record.rounds || []).length} ラウンド`,
+      formatDuration(total),
+      record.partial ? '途中まで' : '',
+    ].filter(Boolean).join('・');
     main.append(topic, sub);
     const arrow = document.createElement('span');
     arrow.className = 'h-arrow';

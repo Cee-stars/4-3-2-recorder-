@@ -50,6 +50,7 @@ await step('the button resumes into round 2', async () => {
 });
 
 await step('breathing guide alternates in break 2', async () => {
+  await advance(page, 2);                  // 画面が変わった直後の誤タップ扱いを避ける
   await page.click('#btn-skip');           // ラウンド 2 を終える
   await page.waitForTimeout(500);
   if (!await page.locator('#break-breathe').isVisible()) throw new Error('breathe panel hidden');

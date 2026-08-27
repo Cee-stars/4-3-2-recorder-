@@ -6,6 +6,13 @@
 
 import { buildPhases } from './config.js';
 
+/**
+ * フェーズが変わった直後の「次へ進む」は、前の画面を送ったタップが
+ * 二重に入ったものとみなして無視する。始まったばかりのラウンドが
+ * いきなり終わってしまうのを防ぐ。
+ */
+const SKIP_GRACE_MS = 700;
+
 export class Session {
   /**
    * @param {object} settings
@@ -21,6 +28,7 @@ export class Session {
     this.timerId = null;
     this.lastTickSecond = -1;
     this.finished = false;
+    this.ending = false;
     this._onVisible = () => this._tick();
   }
 
@@ -35,13 +43,15 @@ export class Session {
 
   /** 現在のフェーズを早めに終える（「次へ進む」ボタン）。 */
   skip() {
-    if (this.finished) return;
+    if (this.finished || this.ending) return;
+    if (!this.held && Date.now() - this.startedAt < SKIP_GRACE_MS) return;
     this._endPhase(true);
   }
 
   /** セッションを中断してタイマーを片付ける。 */
   abort() {
     this.finished = true;
+    this.ending = false;
     this._stopTimer();
     document.removeEventListener('visibilitychange', this._onVisible);
   }
@@ -97,12 +107,19 @@ export class Session {
   }
 
   async _endPhase(skipped) {
-    if (this.finished) return;
+    // 録音の停止を待つ間に二度押しされると、フェーズを 2 つ進めて
+    // 休憩やラウンドを丸ごと飛ばしてしまうので、終了処理は 1 回だけ通す。
+    if (this.finished || this.ending) return;
+    this.ending = true;
     this._stopTimer();
     const phase = this.phase;
     const elapsedMs = Math.min(phase.ms, Date.now() - this.startedAt);
-    await this.handlers.onPhaseEnd?.(phase, { skipped, elapsedMs });
-    this._next();
+    try {
+      await this.handlers.onPhaseEnd?.(phase, { skipped, elapsedMs });
+    } finally {
+      this.ending = false;
+    }
+    if (!this.finished) this._next();
   }
 }
 

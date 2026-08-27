@@ -72,6 +72,7 @@ await step('session starts and records', async () => {
 });
 
 await step('break 1 shows the word-notes panel', async () => {
+  await page.waitForTimeout(800);
   await page.click('#btn-skip');
   await page.waitForTimeout(500);
   if (!await page.locator('#break-notes').isVisible()) throw new Error('notes panel hidden');
@@ -84,6 +85,7 @@ await step('break 1 shows the word-notes panel', async () => {
 });
 
 await step('round 2 restarts recording', async () => {
+  await page.waitForTimeout(800);
   await page.click('#btn-skip');
   await page.waitForTimeout(1200);
   const badge = await page.locator('#phase-badge').textContent();
@@ -94,6 +96,7 @@ await step('round 2 restarts recording', async () => {
 });
 
 await step('break 2 hides everything but the breathing circle', async () => {
+  await page.waitForTimeout(800);
   await page.click('#btn-skip');
   await page.waitForTimeout(400);
   if (!await page.locator('#break-breathe').isVisible()) throw new Error('breathe panel hidden');
@@ -103,10 +106,12 @@ await step('break 2 hides everything but the breathing circle', async () => {
 });
 
 await step('round 3 then finish', async () => {
+  await page.waitForTimeout(800);
   await page.click('#btn-skip');
   await page.waitForTimeout(1200);
   const badge = await page.locator('#phase-badge').textContent();
   if (!badge.startsWith('3ラウンド目')) throw new Error(`badge "${badge}"`);
+  await page.waitForTimeout(800);
   await page.click('#btn-skip');
   await page.waitForSelector('#screen-result.is-active', { timeout: 5000 });
 });
