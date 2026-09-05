@@ -47,11 +47,27 @@ function syncViewportHeight() {
   if (viewportRaf) return;
   viewportRaf = requestAnimationFrame(() => {
     viewportRaf = 0;
-    const height = window.visualViewport?.height ?? window.innerHeight;
-    if (height > 0) {
-      document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
-    }
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    const layout = window.innerHeight;
+    const visible = Math.round(viewport?.height ?? layout);
+
+    // キーボードが出ると visualViewport だけが縮む。そこに画面全体を合わせると
+    // カードもボタンも潰れてしまうので、広がる方向にだけ追従する。
+    const height = Math.max(layout, visible);
+    if (height > 0) root.style.setProperty('--app-height', `${height}px`);
+
+    // キーボードで隠れるぶんは余白として確保し、中身をスクロールで届くようにする。
+    const keyboard = Math.max(0, layout - visible - Math.round(viewport?.offsetTop ?? 0));
+    root.style.setProperty('--keyboard', `${keyboard}px`);
   });
+}
+
+/** キーボードに隠れないよう、入力欄を見える位置まで送る。 */
+function keepFocusVisible(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+  setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
 }
 
 function watchViewportHeight() {
@@ -62,6 +78,7 @@ function watchViewportHeight() {
   // ツールバーの出入りはスクロール中に起きるので、その間も合わせ続ける。
   window.visualViewport?.addEventListener('scroll', syncViewportHeight);
   window.addEventListener('pageshow', syncViewportHeight);
+  document.addEventListener('focusin', keepFocusVisible);
 }
 
 /* ---------------- 画面切り替え ---------------- */
@@ -344,7 +361,8 @@ async function enterPhase(phase) {
   if (isSilentBreak) startBreathing(); else stopBreathing();
   // 2 回目の休憩は「何も見ない」ので、メモも指示も伏せる。
   $('#session-memo').hidden = !isRound;
-  $('#cue').hidden = isSilentBreak;
+  // 休憩はパネル側に同じ文言の見出しがあるため、上の一文は出さない（二重表示になる）。
+  $('#cue').hidden = phase.type === 'break';
   $('#level-wrap').hidden = !isRound;
 
   const wantsTranscript = isRound && state.settings.transcribe && isSpeechSupported();
