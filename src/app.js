@@ -351,18 +351,18 @@ async function enterPhase(phase) {
   $('#cue').textContent = phase.cue;
   setRing(1);
   $('#clock').textContent = formatClock(phase.ms);
-  $('#btn-skip').textContent = phase.type === 'round' ? 'このラウンドを終える' : '次のラウンドへ';
+  $('#btn-skip').textContent = phase.records ? 'このラウンドを終える' : '次のラウンドへ';
 
-  const isRound = phase.type === 'round';
-  const isSilentBreak = phase.type === 'break' && phase.index === 1;
+  const isRound = phase.records === true;
+  const isSilentBreak = phase.breathe === true;
 
-  $('#break-notes').hidden = !(phase.type === 'break' && phase.index === 0);
+  $('#break-notes').hidden = phase.notes !== true;
   $('#break-breathe').hidden = !isSilentBreak;
   if (isSilentBreak) startBreathing(); else stopBreathing();
   // 2 回目の休憩は「何も見ない」ので、メモも指示も伏せる。
   $('#session-memo').hidden = !isRound;
   // 休憩はパネル側に同じ文言の見出しがあるため、上の一文は出さない（二重表示になる）。
-  $('#cue').hidden = phase.type === 'break';
+  $('#cue').hidden = phase.hideCue === true;
   $('#level-wrap').hidden = !isRound;
 
   const wantsTranscript = isRound && state.settings.transcribe && isSpeechSupported();
@@ -416,7 +416,7 @@ function tickPhase(remaining, phase, second) {
   setRing(remaining / phase.ms);
   if (second <= 10 && second > 0) {
     $('#stage').classList.add('is-final');
-    if (phase.type === 'round') chime.tick();
+    if (phase.tick) chime.tick();
   }
 }
 
@@ -427,8 +427,11 @@ function holdPhase() {
 }
 
 async function leavePhase(phase, { elapsedMs }) {
-  if (phase.type === 'break') {
-    if (phase.index === 0) state.record.gaps = [...state.gaps];
+  // 録音しないフェーズは、ここで引き返す。`type !== 'break'` で見ていると、
+  // 録音しない新しい工程まで「ラウンドが終わった」扱いになり、
+  // 中身のない偽のラウンドが記録に入る。
+  if (!phase.records) {
+    if (phase.keepGaps) state.record.gaps = [...state.gaps];
     return;
   }
 
@@ -455,7 +458,7 @@ async function leavePhase(phase, { elapsedMs }) {
   // 途中で落ちても録音が残るよう、ラウンドが終わるたびに保存しておく。
   await saveProgress();
 
-  const isLast = phase.index === state.settings.roundMinutes.length - 1;
+  const isLast = phase.last === true;
   if (isLast) chime.sessionEnd(); else chime.roundEnd();
 }
 
