@@ -46,13 +46,16 @@ export class Mic {
   }
 
   /** マイクを 1 回だけ取得してセッション中は使い回す（許可ダイアログを 1 回に抑える）。 */
-  async open() {
+  async open({ raw = false } = {}) {
     if (this.active) return this.stream;
+    // raw のときは3つとも切る。自動ゲインは小声を持ち上げ、ノイズ抑制は
+    // 沈黙を作り直してしまう。「どこで止まったか」を見る録音では、
+    // どちらも消してはいけないものを消す。
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+        echoCancellation: !raw,
+        noiseSuppression: !raw,
+        autoGainControl: !raw,
       },
     });
     this._setupMeter();

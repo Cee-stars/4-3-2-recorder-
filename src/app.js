@@ -5,7 +5,7 @@
 
 import {
   MAX_MEMO_WORDS, TOPIC_SUGGESTIONS, DEFAULT_SETTINGS,
-  buildPhases, loadSettings, saveSettings, clamp,
+  buildPhases, loadSettings, saveSettings, clamp, MODES,
 } from './config.js';
 import { Session, formatClock, formatDuration } from './session.js';
 import { Mic, Chime, isRecordingSupported, extensionFor } from './audio.js';
@@ -144,12 +144,54 @@ function renderMemo() {
   $('#btn-add-memo').disabled = state.memo.length >= MAX_MEMO_WORDS;
 }
 
+/** モードの札。既定は 4/3/2。選び直すと進行表も入れ替わる。 */
+function renderModePicker() {
+  const box = $('#mode-picker');
+  if (!box) return;
+  box.innerHTML = '';
+  MODES.forEach(mode => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.dataset.mode = mode.id;
+    chip.setAttribute('aria-pressed', String(state.settings.mode === mode.id));
+    chip.textContent = mode.name;
+    chip.addEventListener('click', () => {
+      if (state.settings.mode === mode.id) return;
+      state.settings.mode = mode.id;
+      saveSettings(state.settings);
+      renderModePicker();
+      renderPlan();
+      applyModeToSetup();
+    });
+    box.appendChild(chip);
+  });
+  const hint = $('#mode-hint');
+  if (hint) hint.textContent = MODES.find(m => m.id === state.settings.mode)?.hint ?? '';
+}
+
+/** モードごとに、準備画面で使わないものを伏せる。 */
+function applyModeToSetup() {
+  const solo = state.settings.mode === 'solo';
+  const sw = $('#toggle-transcribe')?.closest('.switch');
+  // 文字起こしはこのモードでは出さない。1分→1分では words/min が語数に
+  // 退化し、弱点（組み立て）ではなく流暢さの側を褒める。iOS では
+  // 音声認識が録音を止めてしまう端末もある。
+  if (sw) sw.hidden = solo;
+  if (solo && state.settings.transcribe) {
+    state.settings.transcribe = false;
+    saveSettings(state.settings);
+    const t = $('#toggle-transcribe');
+    if (t) t.checked = false;
+  }
+}
+
 function renderPlan() {
   const list = $('#plan-preview');
   list.innerHTML = '';
   buildPhases(state.settings).forEach(phase => {
     const li = document.createElement('li');
-    if (phase.type === 'break') li.classList.add('is-break');
+    if (!phase.records) li.classList.add('is-break');
     const t = document.createElement('span');
     t.className = 't';
     t.textContent = phase.label;
@@ -305,7 +347,7 @@ async function startSession() {
 
   if (isRecordingSupported()) {
     try {
-      await mic.open();
+      await mic.open({ raw: state.settings.mode === 'solo' });
     } catch (err) {
       const denied = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
       toast(denied ? 'マイクが使えないので録音なしで進めます' : '録音を開始できませんでした');
@@ -351,7 +393,7 @@ async function enterPhase(phase) {
   $('#cue').textContent = phase.cue;
   setRing(1);
   $('#clock').textContent = formatClock(phase.ms);
-  $('#btn-skip').textContent = phase.records ? 'このラウンドを終える' : '次のラウンドへ';
+  $('#btn-skip').textContent = phase.skipLabel ?? (phase.records ? 'このラウンドを終える' : '次のラウンドへ');
 
   const isRound = phase.records === true;
   const isSilentBreak = phase.breathe === true;
@@ -360,7 +402,7 @@ async function enterPhase(phase) {
   $('#break-breathe').hidden = !isSilentBreak;
   if (isSilentBreak) startBreathing(); else stopBreathing();
   // 2 回目の休憩は「何も見ない」ので、メモも指示も伏せる。
-  $('#session-memo').hidden = !isRound;
+  $('#session-memo').hidden = !(phase.showMemo ?? isRound);
   // 休憩はパネル側に同じ文言の見出しがあるため、上の一文は出さない（二重表示になる）。
   $('#cue').hidden = phase.hideCue === true;
   $('#level-wrap').hidden = !isRound;
@@ -379,7 +421,7 @@ async function enterPhase(phase) {
   // 必要なら取り直す。2・3 ラウンド目が無音で終わるのを防ぐ。
   if (!mic.active && isRecordingSupported()) {
     try {
-      await mic.open();
+      await mic.open({ raw: state.settings.mode === 'solo' });
     } catch { /* 取れなければ録音なしで続ける */ }
   }
 
@@ -763,10 +805,12 @@ async function showUsage() {
 function bind() {
   watchViewportHeight();
   renderTopicSuggestions();
+  renderModePicker();
   renderMemo();
   renderPlan();
   fillSettingsForm();
   checkEnvironment();
+  applyModeToSetup();
 
   $('#memo-form').addEventListener('submit', e => { e.preventDefault(); addMemoWord(); });
   $('#btn-start').addEventListener('click', startSession);

@@ -162,6 +162,11 @@ button, input, select { font: inherit; color: inherit; }
 }
 #topic-suggestions::-webkit-scrollbar { display: none; }
 #topic-suggestions .chip { white-space: nowrap; flex: none; }
+.chips-mode .chip[aria-pressed="true"] {
+  border-color: var(--accent, currentColor);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-weight: 700;
+}
 
 .chip {
   display: inline-flex;
